@@ -3,7 +3,7 @@ class Game {
   JSONObject data;
   Arduino arduino;
   
-  int timeToAnswer = 500;
+  int timeToAnswer = 600;
   int timeLeft;
   int currentQuestion;
   int answerOrder;
@@ -14,15 +14,34 @@ class Game {
   String distanceAnswer12;
   String distanceAnswer21;
   String distanceAnswer22;
+  String axisAnswer11;
+  String axisAnswer12;
+  String axisAnswer21;
+  String axisAnswer22;
   
-  Game(String code) {
-    data = loadJSONObject("http://localhost:3000/api/game/" + code);
+  Game() {
+    
+  }
+  
+  boolean setCode(String code) {
+    try {
+      data = loadJSONObject("http://interfaces.meteor.com/api/game/" + code);
+      return true;
+    }
+    catch (Exception e0) {  // Encoding Exception 
+      println("Not found");
+    } 
+    return false;
   }
   
   void startGame() {
     timeLeft = timeToAnswer;
     currentQuestion = 0;
     renderQuestion();
+  }
+  
+  void stopGame() {
+    isRunning = false;
   }
   
   void checkAnswer() {
@@ -34,12 +53,13 @@ class Game {
     if (question.getString("type").equals("distance")) {
       result = checkDistance();
     } else {
-      
+      result = checkAxis();
     }
     
+    arduino.sendResult(result);
     uploadResult(question.getString("_id"), result);
-    
-    delay(500);
+
+    delay(1000);
     isRunning = false;
     
     if (data.getJSONArray("questions").size() > currentQuestion +1) {
@@ -49,7 +69,19 @@ class Game {
   }
   
   void uploadResult(String questionId, int result) {
-    loadJSONObject("http://localhost:3000/api/questions/" + questionId + "/set-result/" + result);
+    loadJSONObject("http://interfaces.meteor.com/api/questions/" + questionId + "/set-result/" + result);
+  }
+  
+  int getQuestionType() {
+    JSONObject question = data.getJSONArray("questions").getJSONObject(currentQuestion);
+    if (question.getString("type").equals("distance")) {
+      return 1;
+    }
+    if (question.getString("type").equals("axis")) {
+      return 2;
+    }
+    
+    return 0;
   }
   
   void renderQuestion() {
@@ -61,10 +93,7 @@ class Game {
     if (question.getString("type").equals("distance")) {
       renderDistance();
     } else {
-      distanceAnswer11 = "";
-      distanceAnswer12 = "";
-      distanceAnswer21 = "";
-      distanceAnswer22 = "";
+      renderAxis();
     }
   }
   
@@ -116,7 +145,59 @@ class Game {
       distanceAnswer12 = options.getString("correctText");
       distanceAnswer21 = options.getString("correctText");
       distanceAnswer22 = options.getString("incorrectText");
-    }  
+    } 
+  }
+  
+  int checkAxis() {
+    int result = 0;
+    
+    if (answerOrder == 0) {
+      result += arduino.axis1 == 0 ? 1 : 0;
+      result += arduino.axis2 == 0 ? 2 : 0;
+    }
+    if (answerOrder == 1) {
+      result += arduino.axis1 == 1 ? 1 : 0;
+      result += arduino.axis2 == 1 ? 2 : 0;
+    }
+    if (answerOrder == 2) {
+      result += arduino.axis1 == 0 ? 1 : 0;
+      result += arduino.axis2 == 1 ? 2 : 0;
+    }
+    if (answerOrder == 3) {
+      result += arduino.axis1 == 1 ? 1 : 0;
+      result += arduino.axis2 == 0 ? 2 : 0;
+    }
+    
+    return result;
+  }
+  
+  void renderAxis() {
+    JSONObject question = data.getJSONArray("questions").getJSONObject(currentQuestion);
+    JSONObject options = question.getJSONObject("axis"); 
+    if (answerOrder == 0) {
+      axisAnswer11 = options.getString("correctText");
+      axisAnswer12 = options.getString("incorrectText");
+      axisAnswer21 = options.getString("correctText");
+      axisAnswer22 = options.getString("incorrectText");
+    } 
+    if (answerOrder == 1) {
+      axisAnswer11 = options.getString("incorrectText");
+      axisAnswer12 = options.getString("correctText");
+      axisAnswer21 = options.getString("incorrectText");
+      axisAnswer22 = options.getString("correctText");
+    }
+    if (answerOrder == 2) {
+      axisAnswer11 = options.getString("correctText");
+      axisAnswer12 = options.getString("incorrectText");
+      axisAnswer21 = options.getString("incorrectText");
+      axisAnswer22 = options.getString("correctText");
+    }
+    if (answerOrder == 3) {
+      axisAnswer11 = options.getString("incorrectText");
+      axisAnswer12 = options.getString("correctText");
+      axisAnswer21 = options.getString("correctText");
+      axisAnswer22 = options.getString("incorrectText");
+    } 
   }
   
 }
